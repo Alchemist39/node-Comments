@@ -3,23 +3,23 @@
 		<title>Комментирование на NODE.js</title>
 		<meta charset="utf-8">
 		<link href="/css/bootstrap.min.css" rel="stylesheet">
-		<link href="/css/main.css" rel="stylesheet">
+		<link href="/main.css" rel="stylesheet">
 	</head>
 	<body>
 		<div class="container">
 			<div class="registration">
 				<h2>Регистрация</h2>
-				<form action="register_user.php" method="post">
+				<form action="/reg" method="post">
 					<p>
 					<label>Ваш логин:<br></label>
-					<input name="login" type="text" size="32" maxlength="32">
+					<input name="user[name]" type="text" size="32" maxlength="32">
 					</p>
 					<p>
 					<label>Ваш пароль:<br></label>
-					<input name="pass" type="password" size="32" maxlength="32">
+					<input name="user[password]" type="pass" size="32" maxlength="32">
 					</p>
 					<p>
-					<input type="email" name="email" class="form-control" id="exampleInputEmail1" placeholder="jane.doe@example.com">
+					<input type="email" name="user[email]" class="form-control" id="exampleInputEmail1" placeholder="jane.doe@example.com">
 					</p>
 					<p>
 					<input type="submit" name="submit" value="Зарегистрироваться/войти">
