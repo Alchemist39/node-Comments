@@ -2,8 +2,16 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var mysql = require('promise-mysql');
 var Promise = require("bluebird");
+var session = require('express-session');
 
 var app = express();
+app.use(session({
+  secret: 'aple',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { maxAge: 60000 }
+}))
+
 // подключаем бодипарсер, который разбирает тело запроса
 app.use(bodyParser.urlencoded({
 	extended: true
@@ -12,6 +20,17 @@ app.use(bodyParser.urlencoded({
 app.listen(3000, function () {
   console.log('Example app listening on port 3000!');
 });
+
+app.get('/', function(req, res, next) {
+	var sess = req.session;
+	if (sess.views) {
+		sess.views++;
+		res.end();
+	} else {
+		sess.views = 1;
+	}
+});
+
 // создаем постоянный коннект с базой
 var client;
 mysql.createConnection({
@@ -23,11 +42,6 @@ mysql.createConnection({
 }).then((conn) => {
 	client = conn;
 });
-/*
-client.query('SELECT pass FROM users WHERE login = \`тта\`', function(error, result, fields){
-	console.log(JSON.stringify(result));
-});
-*/
 app.get('/page/:page', function(req, res) {
 	let count = 'SELECT COUNT(*) as total FROM comments';
 	client.query(count).then(([{total: tableLength}]) => {
@@ -44,13 +58,9 @@ app.get('/page/:page', function(req, res) {
 		let pagesHTML = '';
 		for(let i = 1; i <= maxPage; i++) {
 			if(currentPage == i) {
-				pagesHTML += `
-					${i}
-				`;
+				pagesHTML += i;
 			} else {
-				pagesHTML += `
-					<a href="/page/${i}">${i}</a>
-				`;
+				pagesHTML += `<a href="/page/${i}">${i}</a>`;
 			}
 		}
 
@@ -62,16 +72,16 @@ app.get('/page/:page', function(req, res) {
 		});
 	}).then(({pagesHTML, comments}) => {
 		let commentsHTML = '';
-		for(let i = 0; i < comments.length; i++) {
+		for(let {name, id, comment} of comments) {
 			commentsHTML += `
 				<p class="name">
-					${comments[i].name}
+					${name}
 				</p>
 				<p class="text">
-					${comments[i].id}
+					${id}
 				</p>
 				<p class="text">
-					${comments[i].comment}
+					${comment}
 				</p>
 			`;
 		}
@@ -111,18 +121,18 @@ app.get('/page/:page', function(req, res) {
 							${pagesHTML}
 						</div>
 
-						<form class="form-inline" method="POST" action="/post.php">
+						<form class="form-inline" method="POST" action="/post">
 							<div class="form-group">
 								<label for="exampleInputName2">Name</label>
-								<input type="text" name="name" class="form-control" id="exampleInputName2" placeholder="Jane Doe">
+								<input type="text" name="user[name]" class="form-control" id="exampleInputName2" placeholder="Jane Doe">
 							</div>
 							<div class="form-group">
 								<label for="exampleInputEmail2">Email</label>
-								<input type="email" name="email" class="form-control" id="exampleInputEmail2" placeholder="jane.doe@example.com">
+								<input type="email" name="user[email]" class="form-control" id="exampleInputEmail2" placeholder="jane.doe@example.com">
 							</div>
 							<button type="submit" class="btn btn-default">Отправить сообщение</button></br>
 							<p><a href="exit.php">выход</a></p>
-							<textarea class="text_input" name="comment" rows="3"></textarea>
+							<textarea class="text_input" name="user[comment]" rows="3"></textarea>
 						</form>
 					</div>
 				</body>
@@ -181,18 +191,18 @@ app.get('/', function(req, res) {
 							${comments}
 						</div>
 
-						<form class="form-inline" method="POST" action="/post.php">
+						<form class="form-inline" method="POST" action="/post">
 							<div class="form-group">
 								<label for="exampleInputName2">Name</label>
-								<input type="text" name="name" class="form-control" id="exampleInputName2" placeholder="Jane Doe">
+								<input type="text" name="user[name]" class="form-control" id="exampleInputName2" placeholder="Jane Doe">
 							</div>
 							<div class="form-group">
 								<label for="exampleInputEmail2">Email</label>
-								<input type="email" name="email" class="form-control" id="exampleInputEmail2" placeholder="jane.doe@example.com">
+								<input type="email" name="user[email]" class="form-control" id="exampleInputEmail2" placeholder="jane.doe@example.com">
 							</div>
 							<button type="submit" class="btn btn-default">Отправить сообщение</button></br>
 							<p><a href="exit.php">выход</a></p>
-							<textarea class="text_input" name="comment" rows="3"></textarea>
+							<textarea class="text_input" name="user[comment]" rows="3"></textarea>
 						</form>
 					</div>
 				</body>
@@ -228,7 +238,32 @@ app.post('/reg', function(request, response){
 	});
 	// меняем ссылку на стартовую во избежание повторной отправки запроса
 	response.set({
-		refresh: '2;url=/'
+		refresh: '2;url=/page/4'
+	});
+	// отправляем файл стартовой страницы
+	response.sendFile( __dirname + '/client/index.html');
+});
+
+app.post('/post', function(request, response){
+	client.query(mysql.format(`
+		INSERT INTO comments (
+			\`name\`,
+			\`email\`,
+			\`comment\`
+		)
+		VALUES (
+			?,
+			?,
+			?
+		);
+	`,  [
+		request.body.user.name,
+		request.body.user.email,
+		request.body.user.comment
+	]));
+	// меняем ссылку на стартовую во избежание повторной отправки запроса
+	response.set({
+		refresh: '2;url=/page/4'
 	});
 	// отправляем файл стартовой страницы
 	response.sendFile( __dirname + '/client/index.html');

@@ -7,6 +7,7 @@
     "bluebird": "^3.5.0",
     "body-parser": "^1.17.2",
     "express": "^4.15.3",
+    "express-session": "^1.15.4",
     "middleware": "^1.0.0",
     "node-static": "^0.7.9",
     "promise-mysql": "^3.0.2"
