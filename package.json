@@ -1,0 +1,21 @@
+{
+  "name": "nodecomments.local",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "body-parser": "^1.17.2",
+    "express": "^4.15.3",
+    "middleware": "^1.0.0",
+    "node-static": "^0.7.9",
+    "promise-mysql": "^3.0.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Andrey Kalitin",
+  "license": "ISC"
+}
