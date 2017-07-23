@@ -1,15 +1,23 @@
+'use strict';
 var express = require('express');
 var bodyParser = require('body-parser');
 var mysql = require('promise-mysql');
 var Promise = require("bluebird");
 var session = require('express-session');
 
+let crypto;
+try {
+  crypto = require('crypto');
+} catch (err) {
+  console.log('crypto support is disabled!');
+}
+
 var app = express();
 app.use(session({
-  secret: 'aple',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { maxAge: 60000 }
+	secret: 'aple',
+	resave: false,
+	saveUninitialized: true,
+	cookie: { maxAge: 60000 }
 }))
 
 // подключаем бодипарсер, который разбирает тело запроса
@@ -42,6 +50,7 @@ mysql.createConnection({
 }).then((conn) => {
 	client = conn;
 });
+
 app.get('/page/:page', function(req, res) {
 	let count = 'SELECT COUNT(*) as total FROM comments';
 	client.query(count).then(([{total: tableLength}]) => {
@@ -210,13 +219,37 @@ app.get('/', function(req, res) {
 		`);
 	});
 });
+var sha512 = function(password, salt){
+	let hash = crypto.createHmac('sha512', salt); // Hashing algorithm sha512 
+	hash.update(password);
+	let value = hash.digest('hex');
+	return {
+		salt:salt,
+		passwordHash:value
+	};
+};
+
+var saltHashPassword = function (userpassword) {
+	let salt = 'aasdsidj9182u1j2'; 
+	let passwordData = sha512(userpassword, salt);
+	return passwordData.passwordHash;
+};
 // при получении POST запроса вставляем данные в таблицу через placeholder
 app.post('/reg', function(request, response){
 	let sql = mysql.format('SELECT login FROM users WHERE login = ?', [request.body.user.name]);
 	client.query(sql, function(error, result, fields){
 		if(result.length > 0) {
-			console.log('пользователь существует');
+			let passMatch = mysql.format('SELECT pass FROM users WHERE login = ?', [request.body.user.name]);
+			client.query(passMatch, function(error, result, fields){
+				let hashedPassword = saltHashPassword(request.body.user.password);
+				if(hashedPassword === result[0].pass) {
+					console.log('С возвращением, ' + request.body.user.name);
+				} else {
+					console.log('Неверный пароль');
+				}
+			});
 		} else {
+			let hashedPassword = saltHashPassword(request.body.user.password)
 			client.query(mysql.format(`
 				INSERT INTO users (
 					\`login\`,
@@ -230,7 +263,7 @@ app.post('/reg', function(request, response){
 				);
 			`,  [
 				request.body.user.name,
-				request.body.user.password,
+				hashedPassword,
 				request.body.user.email
 			]));
 			console.log('пользователь зарегистрирован');
@@ -268,6 +301,14 @@ app.post('/post', function(request, response){
 	// отправляем файл стартовой страницы
 	response.sendFile( __dirname + '/client/index.html');
 });
+/*
+var genRandomString = function(length){
+	return crypto.randomBytes(Math.ceil(length/2))
+			.toString('hex') // convert to hexadecimal format 
+			.slice(0,length);   // return required number of characters 
+};*/
+
+
 
 // предоставляем к загрузке все файлы в каталоге client
 app.use(express.static('client'));
