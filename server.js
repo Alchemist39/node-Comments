@@ -16,10 +16,8 @@ var app = express();
 app.use(session({
 	secret: 'aple',
 	resave: false,
-	saveUninitialized: true,
-	cookie: { maxAge: 60000 }
-}))
-
+	saveUninitialized: true
+}));
 // подключаем бодипарсер, который разбирает тело запроса
 app.use(bodyParser.urlencoded({
 	extended: true
@@ -50,6 +48,27 @@ mysql.createConnection({
 }).then((conn) => {
 	client = conn;
 });
+let registrationHTML = `
+	<div class="registration">
+		<h2>Регистрация</h2>
+		<form action="/reg" method="post">
+			<p>
+			<label>Ваш логин:<br></label>
+			<input name="user[name]" type="text" size="32" maxlength="32">
+			</p>
+			<p>
+			<label>Ваш пароль:<br></label>
+			<input name="user[password]" type="pass" size="32" maxlength="32">
+			</p>
+			<p>
+			<input type="email" name="user[email]" class="form-control" id="exampleInputEmail1" placeholder="jane.doe@example.com">
+			</p>
+			<p>
+			<input type="submit" name="submit" value="Зарегистрироваться/войти">
+			</p>
+		</form>
+	</div>
+`;
 
 app.get('/page/:page', function(req, res) {
 	let count = 'SELECT COUNT(*) as total FROM comments';
@@ -94,6 +113,11 @@ app.get('/page/:page', function(req, res) {
 				</p>
 			`;
 		}
+		let name = req.session.name || '';
+		let email = req.session.email || '';
+		if(req.session.name) {
+			registrationHTML = '';
+		}
 		res.send(`
 			<html>
 				<head>
@@ -104,25 +128,7 @@ app.get('/page/:page', function(req, res) {
 				</head>
 				<body>
 					<div class="container">
-						<div class="registration">
-							<h2>Регистрация</h2>
-							<form action="/reg" method="post">
-								<p>
-								<label>Ваш логин:<br></label>
-								<input name="user[name]" type="text" size="32" maxlength="32">
-								</p>
-								<p>
-								<label>Ваш пароль:<br></label>
-								<input name="user[password]" type="pass" size="32" maxlength="32">
-								</p>
-								<p>
-								<input type="email" name="user[email]" class="form-control" id="exampleInputEmail1" placeholder="jane.doe@example.com">
-								</p>
-								<p>
-								<input type="submit" name="submit" value="Зарегистрироваться/войти">
-								</p>
-							</form>
-						</div>
+						${registrationHTML}
 						<div class="comments">
 							${commentsHTML}
 						</div>
@@ -133,14 +139,14 @@ app.get('/page/:page', function(req, res) {
 						<form class="form-inline" method="POST" action="/post">
 							<div class="form-group">
 								<label for="exampleInputName2">Name</label>
-								<input type="text" name="user[name]" class="form-control" id="exampleInputName2" placeholder="Jane Doe">
+								<input type="text" value="${name}" name="user[name]" class="form-control" id="exampleInputName2" placeholder="Jane Doe">
 							</div>
 							<div class="form-group">
 								<label for="exampleInputEmail2">Email</label>
-								<input type="email" name="user[email]" class="form-control" id="exampleInputEmail2" placeholder="jane.doe@example.com">
+								<input type="email" value="${email}" name="user[email]" class="form-control" id="exampleInputEmail2" placeholder="jane.doe@example.com">
 							</div>
 							<button type="submit" class="btn btn-default">Отправить сообщение</button></br>
-							<p><a href="exit.php">выход</a></p>
+							<p><a href="/exit">выход</a></p>
 							<textarea class="text_input" name="user[comment]" rows="3"></textarea>
 						</form>
 					</div>
@@ -149,6 +155,15 @@ app.get('/page/:page', function(req, res) {
 		`);
 	})
 });
+app.get('/exit', function(req, res) {
+	req.session.name = null;
+	req.session.email = null;
+	res.set({
+		refresh: '2;url=/page/4'
+	});
+
+	res.sendFile( __dirname + '/client/index.html');
+})
 
 app.get('/', function(req, res) {
 	let sql = 'SELECT name, comment, id FROM comments LIMIT 10';
@@ -177,25 +192,7 @@ app.get('/', function(req, res) {
 				</head>
 				<body>
 					<div class="container">
-						<div class="registration">
-							<h2>Регистрация</h2>
-							<form action="/reg" method="post">
-								<p>
-								<label>Ваш логин:<br></label>
-								<input name="user[name]" type="text" size="32" maxlength="32">
-								</p>
-								<p>
-								<label>Ваш пароль:<br></label>
-								<input name="user[password]" type="pass" size="32" maxlength="32">
-								</p>
-								<p>
-								<input type="email" name="user[email]" class="form-control" id="exampleInputEmail1" placeholder="jane.doe@example.com">
-								</p>
-								<p>
-								<input type="submit" name="submit" value="Зарегистрироваться/войти">
-								</p>
-							</form>
-						</div>
+						${registrationHTML}
 						<div class="comments">
 							${comments}
 						</div>
@@ -239,11 +236,13 @@ app.post('/reg', function(request, response){
 	let sql = mysql.format('SELECT login FROM users WHERE login = ?', [request.body.user.name]);
 	client.query(sql, function(error, result, fields){
 		if(result.length > 0) {
-			let passMatch = mysql.format('SELECT pass FROM users WHERE login = ?', [request.body.user.name]);
+			let passMatch = mysql.format('SELECT pass, email FROM users WHERE login = ?', [request.body.user.name]);
 			client.query(passMatch, function(error, result, fields){
 				let hashedPassword = saltHashPassword(request.body.user.password);
 				if(hashedPassword === result[0].pass) {
 					console.log('С возвращением, ' + request.body.user.name);
+					request.session.name = request.body.user.name;
+					request.session.email = result[0].email;
 				} else {
 					console.log('Неверный пароль');
 				}
@@ -266,6 +265,8 @@ app.post('/reg', function(request, response){
 				hashedPassword,
 				request.body.user.email
 			]));
+			request.session.name = request.body.user.name;
+			request.session.email = request.body.user.email;
 			console.log('пользователь зарегистрирован');
 		}
 	});
